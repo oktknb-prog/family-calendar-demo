@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家族カレンダー 試作版</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN",sans-serif;color:#243041;background:#f5f7fb}*{box-sizing:border-box}body{margin:0;padding:16px}main{max-width:960px;margin:auto}h1{font-size:1.35rem;margin:0}header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}.toolbar{display:flex;align-items:center;gap:10px}button{cursor:pointer;font:inherit;border:1px solid #cbd5e1;background:white;border-radius:9px;padding:9px 12px}button:focus-visible{outline:3px solid #2563eb}#monthLabel{font-size:1.1rem;font-weight:bold;min-width:7em;text-align:center}.calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.weekday{text-align:center;font-weight:bold;padding:10px 0}.weekday:first-child{color:#be123c}.weekday:last-child{color:#1d4ed8}.day{min-height:78px;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:8px;border-radius:8px;border:1px solid #d7dee9;background:white;text-align:left;overflow-wrap:anywhere}.day.outside{background:#edf0f5;color:#8792a4}.day.selected{outline:3px solid #2563eb}.day.today .num{background:#2563eb;color:white;border-radius:50%;padding:3px 8px}.num{font-weight:bold}.event{font-size:.72rem;background:#e0f2fe;border-radius:4px;padding:3px 4px;width:100%}.panel{margin-top:18px;padding:16px;border-radius:12px;background:white;border:1px solid #d7dee9}label{display:block;font-weight:600;margin:12px 0 5px}input{font:inherit;width:100%;padding:10px;border:1px solid #b6c2d2;border-radius:8px}.actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}.primary{background:#2563eb;color:white;border-color:#2563eb}#status{min-height:1.5em;color:#36526b}small{color:#64748b}@media(max-width:550px){body{padding:8px}.day{min-height:61px;padding:4px}.event{font-size:.62rem}.weekday{font-size:.85rem}header{justify-content:center}h1{width:100%;text-align:center}}
+</style></head><body><main>
+<header><h1>家族カレンダー <small>試作版 v0.2</small></h1><div class="toolbar"><button id="prev" type="button" aria-label="前の月">◀</button><span id="monthLabel" aria-live="polite"></span><button id="next" type="button" aria-label="次の月">▶</button></div></header>
+<div class="calendar" id="calendar" aria-label="月間カレンダー"></div>
+<section class="panel"><h2 id="selectedDate">日付を選んでください</h2><p><small>日付をタップして予定を入力できます。保存先はこのブラウザ内だけです。</small></p>
+<label for="eventTime">時刻（任意）</label><input id="eventTime" type="time">
+<label for="eventTitle">予定の内容</label><input id="eventTitle" type="text" placeholder="例：通院、出張、買い物">
+<div class="actions"><button class="primary" id="save" type="button">予定を保存</button><button id="clear" type="button">入力を消す</button></div><p id="status" role="status"></p>
+</section><p><small>この版は日付選択・予定入力の動作確認用です。手書き認識・Googleカレンダー連携は未実装です。公開ページには個人情報を入力しないでください。</small></p>
+</main><script>
+(function(){
+"use strict";
+const today=new Date(), calendar=document.getElementById("calendar"), monthLabel=document.getElementById("monthLabel");
+const selectedDate=document.getElementById("selectedDate"), title=document.getElementById("eventTitle"), time=document.getElementById("eventTime"), status=document.getElementById("status");
+let year=today.getFullYear(),month=today.getMonth(),selected=null;
+const pad=n=>String(n).padStart(2,"0");
+const key=(y,m,d)=>y+"-"+pad(m+1)+"-"+pad(d);
+let events={};try{events=JSON.parse(localStorage.getItem("family-calendar-demo-v02")||"{}")||{}}catch(e){events={}}
+function render(){
+monthLabel.textContent=year+"年 "+(month+1)+"月";calendar.replaceChildren();
+["日","月","火","水","木","金","土"].forEach(w=>{const x=document.createElement("div");x.className="weekday";x.textContent=w;calendar.append(x)});
+const first=new Date(year,month,1).getDay(),days=new Date(year,month+1,0).getDate();
+for(let cell=0;cell<42;cell++){const d=cell-first+1,valid=d>=1&&d<=days;
+const b=document.createElement("button");b.type="button";b.className="day"+(valid?"":" outside");if(!valid){b.disabled=true;calendar.append(b);continue}
+const k=key(year,month,d);b.setAttribute("aria-label",(month+1)+"月"+d+"日");if(k===selected)b.classList.add("selected");if(k===key(today.getFullYear(),today.getMonth(),today.getDate()))b.classList.add("today");
+const n=document.createElement("span");n.className="num";n.textContent=d;b.append(n);
+(events[k]||[]).slice(0,2).forEach(e=>{const s=document.createElement("span");s.className="event";s.textContent=(e.time?e.time+" ":"")+e.title;b.append(s)});
+b.addEventListener("click",()=>{selected=k;selectedDate.textContent=year+"年"+(month+1)+"月"+d+"日の予定";status.textContent="";render()});calendar.append(b)}
+}
+document.getElementById("prev").addEventListener("click",()=>{month--;if(month<0){month=11;year--}selected=null;selectedDate.textContent="日付を選んでください";render()});
+document.getElementById("next").addEventListener("click",()=>{month++;if(month>11){month=0;year++}selected=null;selectedDate.textContent="日付を選んでください";render()});
+document.getElementById("save").addEventListener("click",()=>{if(!selected){status.textContent="先に日付を選んでください。";return}const value=title.value.trim();if(!value){status.textContent="予定の内容を入力してください。";return}(events[selected]||(events[selected]=[])).push({title:value,time:time.value});try{localStorage.setItem("family-calendar-demo-v02",JSON.stringify(events))}catch(e){status.textContent="ブラウザへの保存に失敗しました。";return}title.value="";time.value="";status.textContent="この端末のブラウザに保存しました。";render()});
+document.getElementById("clear").addEventListener("click",()=>{title.value="";time.value="";status.textContent="入力を消しました。"});
+render();
+})();
+</script></body></html>
